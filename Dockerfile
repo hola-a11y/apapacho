@@ -1,4 +1,19 @@
-# Imagen slim, usuario no root, sin secretos: API_KEY se inyecta por entorno en runtime.
+# Build en dos fases:
+# 1) "builder" usa la imagen completa python:3.12, que ya trae gcc, para compilar las
+#    dependencias sin wheel para Python 3.12 (pyswisseph, el motor de Swiss Ephemeris).
+#    Misma versión de Debian que la slim, así que las wheels son compatibles.
+# 2) La imagen final es slim, sin compilador, con usuario no root y sin secretos:
+#    API_KEY se inyecta por entorno en tiempo de ejecución.
+
+FROM python:3.12 AS builder
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+COPY requirements.txt .
+RUN pip wheel --wheel-dir /wheels -r requirements.txt
+
+
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -8,9 +23,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /srv/apapacho
 
-# Dependencias primero para aprovechar la caché de capas.
+# Instala solo desde las wheels ya compiladas, sin acceso al índice.
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+COPY --from=builder /wheels /wheels
+RUN pip install --no-index --find-links=/wheels -r requirements.txt \
+    && rm -rf /wheels
 
 # Usuario sin privilegios.
 RUN groupadd --system --gid 1001 app \

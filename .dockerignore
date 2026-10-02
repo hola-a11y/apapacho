@@ -1,0 +1,13 @@
+# Nunca enviar secretos ni metadatos al contexto de build.
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.venv
+venv
+tests
+docker-compose*.yml
