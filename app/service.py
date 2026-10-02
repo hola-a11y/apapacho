@@ -273,7 +273,105 @@ def fase_lunar(sol_abs: float, luna_abs: float) -> dict:
 
 
 def _signo(sign_num: int, grado: float) -> dict:
-    return {"signo": SIGNOS_ES[sign_num], "grado": round(grado, 2), "grado_texto": grado_texto(grado)}
+    return {
+        "longitud": round(sign_num * 30 + grado, 2),
+        "signo": SIGNOS_ES[sign_num],
+        "grado": round(grado, 2),
+        "grado_texto": grado_texto(grado),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Aspectos
+# ---------------------------------------------------------------------------
+
+# (nombre, ángulo exacto, orbe base, armónico)
+TIPOS_ASPECTO: tuple[tuple[str, float, float, Optional[bool]], ...] = (
+    ("conjunción", 0.0, 8.0, None),
+    ("sextil", 60.0, 6.0, True),
+    ("cuadratura", 90.0, 8.0, False),
+    ("trígono", 120.0, 8.0, True),
+    ("oposición", 180.0, 8.0, False),
+)
+# Si interviene el Sol o la Luna, el orbe se amplía 2°: 10° (8° en el sextil).
+EXTRA_ORBE_LUMINARIA = 2.0
+LUMINARIAS = ("Sol", "Luna")
+ANGULOS_NOMBRES = ("Ascendente", "Medio Cielo")
+
+
+def separacion(lon_a: float, lon_b: float) -> float:
+    """Distancia angular más corta entre dos longitudes, 0-180."""
+    d = (lon_b - lon_a) % 360
+    return min(d, 360 - d)
+
+
+def aspecto_entre(nombre_a: str, lon_a: float, nombre_b: str, lon_b: float) -> Optional[tuple[str, float, float, Optional[bool]]]:
+    """Devuelve (tipo, ángulo exacto, orbe, armónico) si hay aspecto mayor dentro de orbe."""
+    sep = separacion(lon_a, lon_b)
+    luminaria = nombre_a in LUMINARIAS or nombre_b in LUMINARIAS
+    for tipo, exacto, orbe_base, armonico in TIPOS_ASPECTO:
+        orbe_max = orbe_base + (EXTRA_ORBE_LUMINARIA if luminaria else 0.0)
+        orbe = abs(sep - exacto)
+        if orbe <= orbe_max:
+            return tipo, exacto, orbe, armonico
+    return None
+
+
+def calcular_aspectos(puntos: list[dict], puntos_inicio: Optional[list[dict]] = None,
+                      puntos_fin: Optional[list[dict]] = None) -> list[dict]:
+    """Aspectos mayores entre los puntos dados, ordenados por orbe.
+
+    Cada punto es {"nombre", "lon", "vel"} (velocidad en grados/día).
+    Sin hora, `puntos_inicio` y `puntos_fin` son las posiciones a las 00:00 y 23:59: un aspecto
+    `puede_variar` si no se mantiene con el mismo tipo en ambos extremos del día.
+    """
+    aspectos = []
+    for i in range(len(puntos)):
+        for j in range(i + 1, len(puntos)):
+            a, b = puntos[i], puntos[j]
+            if a["nombre"] in ANGULOS_NOMBRES and b["nombre"] in ANGULOS_NOMBRES:
+                continue  # Ascendente-Medio Cielo no se considera aspecto
+            encontrado = aspecto_entre(a["nombre"], a["lon"], b["nombre"], b["lon"])
+            if encontrado is None:
+                continue
+            tipo, exacto, orbe, armonico = encontrado
+
+            # Aplicativo: el orbe se reduce un instante después (dt = 0,01 días).
+            dt = 0.01
+            orbe_despues = abs(separacion(a["lon"] + a["vel"] * dt, b["lon"] + b["vel"] * dt) - exacto)
+
+            puede_variar = False
+            if puntos_inicio is not None and puntos_fin is not None:
+                for extremo in (puntos_inicio, puntos_fin):
+                    otro = aspecto_entre(a["nombre"], extremo[i]["lon"], b["nombre"], extremo[j]["lon"])
+                    if otro is None or otro[0] != tipo:
+                        puede_variar = True
+
+            aspectos.append({
+                "a": a["nombre"],
+                "b": b["nombre"],
+                "tipo": tipo,
+                "armonico": armonico,
+                "angulo": round(separacion(a["lon"], b["lon"]), 2),
+                "orbe": round(orbe, 2),
+                "orbe_texto": grado_texto(orbe),
+                "aplicativo": orbe_despues < orbe,
+                "puede_variar": puede_variar,
+            })
+    aspectos.sort(key=lambda x: x["orbe"])
+    return aspectos
+
+
+def _puntos_aspecto(sujeto, con_angulos: bool) -> list[dict]:
+    puntos = []
+    for clave, nombre, _, atributo in PUNTOS_CARTA:
+        if clave in CLAVES_REPARTO:  # solo los diez planetas
+            p = getattr(sujeto, atributo)
+            puntos.append({"nombre": nombre, "lon": p.abs_pos, "vel": p.speed or 0.0})
+    if con_angulos:
+        puntos.append({"nombre": "Ascendente", "lon": sujeto.ascendant.abs_pos, "vel": sujeto.ascendant.speed or 0.0})
+        puntos.append({"nombre": "Medio Cielo", "lon": sujeto.medium_coeli.abs_pos, "vel": sujeto.medium_coeli.speed or 0.0})
+    return puntos
 
 
 def calcular_carta_completa(
@@ -344,6 +442,13 @@ def calcular_carta_completa(
         elementos[ELEMENTOS[n % 4]] += 1
         modalidades[MODALIDADES[n % 3]] += 1
 
+    if hora_exacta:
+        aspectos = calcular_aspectos(_puntos_aspecto(principal, True))
+    else:
+        aspectos = calcular_aspectos(
+            _puntos_aspecto(principal, False), _puntos_aspecto(inicio, False), _puntos_aspecto(fin, False)
+        )
+
     por_clave = {p["clave"]: p for p in planetas}
     return {
         "sol": por_clave["sol"]["signo"],
@@ -357,4 +462,5 @@ def calcular_carta_completa(
         "elementos": elementos,
         "modalidades": modalidades,
         "fase_lunar": fase_lunar(principal.sun.abs_pos, principal.moon.abs_pos),
+        "aspectos": aspectos,
     }

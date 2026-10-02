@@ -59,12 +59,36 @@ que `/carta`, más la carta natal completa:
 | `elementos` | Recuento de fuego, tierra, aire y agua. |
 | `modalidades` | Recuento de cardinal, fijo y mutable. |
 | `fase_lunar` | `nombre` (Luna nueva ... Luna menguante), `angulo` Luna-Sol e `iluminacion` en %. |
+| `aspectos` | Aspectos mayores, ordenados por orbe: `a`, `b`, `tipo`, `armonico`, `angulo`, `orbe`, `orbe_texto`, `aplicativo` y `puede_variar`. |
+| `rueda_svg` | La rueda zodiacal en SVG, como texto. La misma que devuelve `/carta/rueda.svg`. |
+
+Cada planeta, ángulo y casa trae además `longitud`, de 0 a 360 (0 = 0° Aries).
 
 Elementos y modalidades cuentan los diez planetas de Sol a Plutón, más el ascendente si hay
 hora. Nodo Norte y Quirón no cuentan.
 
+**Aspectos**: conjunción (0°), sextil (60°), cuadratura (90°), trígono (120°) y oposición
+(180°), entre los diez planetas, más Ascendente y Medio Cielo si hay hora. Orbe de 8°, o 6° en
+el sextil, ampliado 2° si interviene el Sol o la Luna. `aplicativo` indica si el aspecto se está
+formando, según la velocidad de cada punto. Ascendente con Medio Cielo no cuenta como aspecto.
+
 **Sin hora**: todo se calcula a las 12:00 locales. `angulos`, `casas` y la `casa` de cada
-planeta son `null`, y cada planeta marca `puede_variar: true` si cambia de signo ese día.
+planeta son `null`, y cada planeta marca `puede_variar: true` si cambia de signo ese día. Un
+aspecto marca `puede_variar: true` si no se mantiene, con el mismo tipo, a las 00:00 y a las 23:59.
+
+### Rueda zodiacal
+
+`POST /carta/rueda.svg` recibe la misma entrada y devuelve `image/svg+xml`: la rueda con signos,
+casas, planetas, grados, retrogradaciones y líneas de aspecto. El Ascendente queda a la
+izquierda. Sin hora, la rueda no tiene casas y 0° Aries queda a la izquierda.
+
+El SVG no lleva scripts, fuentes externas, imágenes ni enlaces, así que se puede incrustar en un
+correo. Incluye `<title>` y `<desc>` con la carta en texto, para lectores de pantalla. Los
+símbolos usan las fuentes del sistema de quien lo abre.
+
+Colores: fondo `#0f1829`, líneas `#c9a15e`, texto `#f6f1e7`, fuego `#f0a07a`, tierra `#b8cf8f`,
+aire `#9fc6ef` y agua `#8fb3e8`. Aspectos armónicos en azul, tensos en naranja, sextiles con
+línea discontinua. Las conjunciones no se dibujan porque los puntos coinciden.
 
 Otros endpoints:
 
@@ -75,6 +99,7 @@ Otros endpoints:
 | GET | `/docs` | no | OpenAPI / Swagger |
 | POST | `/carta` | `X-API-Key` | Sol, Luna y Ascendente |
 | POST | `/carta/completa` | `X-API-Key` | Carta natal completa |
+| POST | `/carta/rueda.svg` | `X-API-Key` | Rueda zodiacal en SVG |
 
 Errores: `401` API key ausente o incorrecta · `422` validación · `429` rate limit.
 
@@ -169,8 +194,9 @@ pytest
 
 Cubre: hora ausente (y detección de cambio de signo lunar), validación de rangos y fechas,
 auth faltante/incorrecta, rate limit, CORS cerrado, zona horaria con horario de verano
-histórico (Ciudad de México 2010 vs 2024, Madrid 1950 vs 1990) y que los logs no contienen
-datos de nacimiento.
+histórico (Ciudad de México 2010 vs 2024, Madrid 1950 vs 1990), que los logs no contienen
+datos de nacimiento, la carta completa con valores conocidos de julio de 1990, los aspectos y
+sus orbes, y que la rueda SVG es válida y no contiene scripts ni recursos externos.
 
 ### Cartas de referencia (astro.com)
 
@@ -305,8 +331,8 @@ formulario: súbelo si esperas más de 30 envíos por minuto.
 
 `web/formulario.html` es un formulario accesible, sin dependencias externas, que envía ciudad,
 fecha y hora a un webhook de n8n y muestra Sol, Luna y Ascendente con sus símbolos. Si la
-respuesta trae la carta completa, muestra también planetas, ángulos, elementos, modalidades y
-fase lunar. Cambia `WEBHOOK_URL` dentro
+respuesta trae la carta completa, muestra también la rueda, planetas, aspectos, ángulos,
+elementos, modalidades y fase lunar. Cambia `WEBHOOK_URL` dentro
 del archivo y súbelo a cualquier hosting estático. La API key nunca va en el HTML: la guarda n8n.
 
 `n8n/workflow-apapacho.json` es el workflow de n8n que hay detrás, listo para importar

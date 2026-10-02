@@ -72,6 +72,7 @@ class RootResponse(BaseModel):
 
 
 class PosicionSigno(BaseModel):
+    longitud: float = Field(..., description="Longitud eclíptica 0-360 (0 = 0° Aries)")
     signo: str = Field(..., description="Signo en español")
     grado: float = Field(..., description="Grado dentro del signo (0-30)")
     grado_texto: str = Field(..., description='Grado en grados y minutos, p. ej. "22°45′"')
@@ -116,6 +117,22 @@ class FaseLunar(BaseModel):
     iluminacion: float = Field(..., description="Porcentaje iluminado del disco lunar")
 
 
+class Aspecto(BaseModel):
+    a: str = Field(..., description="Planeta o ángulo (Sol... Plutón, Ascendente, Medio Cielo)")
+    b: str
+    tipo: str = Field(..., description="conjunción, sextil, cuadratura, trígono u oposición")
+    armonico: Optional[bool] = Field(
+        ..., description="true en trígono y sextil, false en cuadratura y oposición, null en conjunción"
+    )
+    angulo: float = Field(..., description="Separación real entre ambos puntos, 0-180")
+    orbe: float = Field(..., description="Diferencia con el ángulo exacto del aspecto")
+    orbe_texto: str
+    aplicativo: bool = Field(..., description="true si el aspecto se está formando; false si se deshace")
+    puede_variar: bool = Field(
+        ..., description="Sin hora: true si el aspecto no se mantiene todo el día. Con hora: false."
+    )
+
+
 class CartaCompletaResponse(CartaResponse):
     """Incluye los mismos campos que /carta, más la carta completa."""
 
@@ -125,3 +142,9 @@ class CartaCompletaResponse(CartaResponse):
     elementos: Elementos = Field(..., description="Recuento de Sol a Plutón, más el ascendente si hay hora")
     modalidades: Modalidades = Field(..., description="Recuento de Sol a Plutón, más el ascendente si hay hora")
     fase_lunar: FaseLunar
+    aspectos: list[Aspecto] = Field(
+        ..., description="Aspectos mayores entre Sol-Plutón (y Ascendente y Medio Cielo si hay hora), por orbe"
+    )
+    rueda_svg: str = Field(
+        ..., description="Rueda zodiacal en SVG (texto). Sin scripts ni recursos externos."
+    )

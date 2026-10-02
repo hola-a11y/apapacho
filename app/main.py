@@ -19,12 +19,12 @@ from typing import Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app import service
+from app import rueda, service
 from app.schemas import CartaCompletaResponse, CartaRequest, CartaResponse, HealthResponse, RootResponse
 
 # ---------------------------------------------------------------------------
@@ -214,4 +214,40 @@ def carta_completa(request: Request, datos: CartaRequest) -> CartaCompletaRespon
         )
     except (service.ZonaHorariaNoEncontrada, service.HoraInvalida) as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
-    return CartaCompletaResponse(**resultado)
+    return CartaCompletaResponse(**resultado, rueda_svg=rueda.generar_rueda(resultado))
+
+
+@app.post(
+    "/carta/rueda.svg",
+    response_class=Response,
+    dependencies=[Depends(requiere_api_key)],
+    tags=["carta"],
+    responses={
+        200: {"content": {"image/svg+xml": {}}, "description": "Rueda zodiacal"},
+        401: {"description": "API key ausente o incorrecta"},
+        429: {"description": "Rate limit"},
+    },
+)
+@limiter.limit(RATE_LIMIT)
+def carta_rueda_svg(request: Request, datos: CartaRequest) -> Response:
+    """Solo la rueda zodiacal, como imagen SVG. Misma entrada que /carta.
+
+    Sin scripts, fuentes externas ni enlaces: se puede incrustar en un correo o en una web.
+    """
+    try:
+        resultado = service.calcular_carta_completa(
+            year=datos.year,
+            month=datos.month,
+            day=datos.day,
+            hour=datos.hour,
+            minute=datos.minute,
+            lat=datos.lat,
+            lng=datos.lng,
+        )
+    except (service.ZonaHorariaNoEncontrada, service.HoraInvalida) as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    return Response(
+        content=rueda.generar_rueda(resultado),
+        media_type="image/svg+xml",
+        headers={"X-Content-Type-Options": "nosniff", "Content-Disposition": 'inline; filename="carta.svg"'},
+    )

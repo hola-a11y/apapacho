@@ -30,7 +30,8 @@ funciona; tu trabajo es solo el workflow y conectar el formulario HTML.
 - `hour` y `minute` pueden ser `null` si no se conoce la hora. Nunca `""` ni `0` en su lugar.
 - `lat` y `lng` deben ser números, no texto.
 - Respuesta 200: `sol`, `luna`, `ascendente`, `hora_exacta`, `luna_puede_variar`, y además
-  `planetas`, `angulos`, `casas`, `elementos`, `modalidades` y `fase_lunar`. El formulario usa
+  `planetas`, `angulos`, `casas`, `elementos`, `modalidades`, `fase_lunar`, `aspectos` y
+  `rueda_svg`. El formulario usa
   todos esos campos: devuélvelos tal cual, sin filtrar.
 - Errores: 401 clave incorrecta, 422 datos inválidos, 429 más de 30 peticiones por minuto.
 

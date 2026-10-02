@@ -32,6 +32,8 @@
     --error-text: #8a1c12;
     --note-bg: #f3ecf8;
     --radius: 12px;
+    --armonico: #1f5fa8;
+    --tenso: #a8431a;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -46,6 +48,8 @@
       --error-bg: #3a1d1b;
       --error-text: #ffb4a9;
       --note-bg: #2c2433;
+      --armonico: #9fc6ef;
+      --tenso: #f0a07a;
     }
   }
   * { box-sizing: border-box; }
@@ -142,6 +146,16 @@
   .barra { height: .7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 99px; overflow: hidden; }
   .barra span { display: block; height: 100%; background: var(--accent); }
   .num { text-align: right; font-weight: 700; }
+  .rueda { margin: 0; }
+  .rueda img { display: block; width: 100%; height: auto; border-radius: 10px; }
+  .rueda figcaption { color: var(--muted); font-size: .875rem; margin-top: .4rem; }
+  .aspectos { list-style: none; margin: 0; padding: 0; }
+  .aspectos li { display: flex; justify-content: space-between; gap: .75rem; padding: .4rem 0; border-bottom: 1px solid var(--border); }
+  .aspectos .orbe { color: var(--muted); white-space: nowrap; font-size: .9375rem; }
+  .etiqueta { display: inline-block; font-size: .75rem; padding: 0 .4rem; border-radius: 99px; margin-left: .35rem; vertical-align: .1em; border: 1px solid currentColor; }
+  .etiqueta.armonico { color: var(--armonico); }
+  .etiqueta.tenso { color: var(--tenso); }
+  details summary { cursor: pointer; margin-top: .6rem; color: var(--accent); font-weight: 600; }
   .fase { display: flex; align-items: center; gap: .9rem; }
   .fase .glifo { font-size: 2rem; }
   .pie { color: var(--muted); font-size: .875rem; margin-top: 2rem; }
@@ -213,6 +227,14 @@
 
     <!-- Carta completa: se muestra solo si la respuesta incluye estos datos (/carta/completa). -->
     <div id="r-completa" hidden>
+      <div class="bloque" id="r-rueda-bloque" hidden>
+        <h3>Tu rueda</h3>
+        <figure class="rueda">
+          <img id="r-rueda" alt="" width="600" height="600">
+          <figcaption>Ascendente a la izquierda. Líneas azules: aspectos armónicos. Naranjas: tensos.</figcaption>
+        </figure>
+      </div>
+
       <div class="bloque">
         <h3>Planetas</h3>
         <div class="tabla-wrap">
@@ -226,6 +248,16 @@
         </div>
         <p id="r-nota-retro" class="ayuda" hidden>℞ = retrógrado.</p>
         <p id="r-nota-varia" class="ayuda" hidden>* Sin la hora exacta, este punto podría estar en el signo contiguo.</p>
+      </div>
+
+      <div class="bloque" id="r-aspectos-bloque" hidden>
+        <h3>Aspectos principales</h3>
+        <ul class="aspectos" id="r-aspectos"></ul>
+        <details id="r-aspectos-mas" hidden>
+          <summary id="r-aspectos-resumen">Ver todos</summary>
+          <ul class="aspectos" id="r-aspectos-resto"></ul>
+        </details>
+        <p id="r-nota-asp" class="ayuda" hidden>* Sin la hora exacta, este aspecto podría no darse.</p>
       </div>
 
       <div class="bloque" id="r-angulos-bloque" hidden>
@@ -352,6 +384,36 @@
     }
     document.getElementById("r-nota-retro").hidden = !hayRetro;
     document.getElementById("r-nota-varia").hidden = !hayVaria;
+
+    // Rueda: se muestra como <img> con data: URL, así el SVG nunca puede ejecutar nada.
+    const bloqueRueda = document.getElementById("r-rueda-bloque");
+    if (typeof datos.rueda_svg === "string" && datos.rueda_svg.startsWith("<svg")) {
+      const img = document.getElementById("r-rueda");
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(datos.rueda_svg);
+      img.alt = "Rueda zodiacal de tu carta natal. Los mismos datos aparecen en las tablas siguientes.";
+      bloqueRueda.hidden = false;
+    } else {
+      bloqueRueda.hidden = true;
+    }
+
+    const bloqueAsp = document.getElementById("r-aspectos-bloque");
+    const aspectos = Array.isArray(datos.aspectos) ? datos.aspectos : [];
+    bloqueAsp.hidden = aspectos.length === 0;
+    if (aspectos.length) {
+      const VISIBLES = 8;
+      const fila = (a) => {
+        const nombre = el("span", { textContent: `${a.a} ${a.tipo} ${a.b}` + (a.puede_variar ? " *" : "") });
+        if (a.armonico === true) nombre.append(el("span", { className: "etiqueta armonico", textContent: "armónico" }));
+        if (a.armonico === false) nombre.append(el("span", { className: "etiqueta tenso", textContent: "tenso" }));
+        return el("li", {}, [nombre, el("span", { className: "orbe", textContent: `orbe ${a.orbe_texto}` })]);
+      };
+      document.getElementById("r-aspectos").replaceChildren(...aspectos.slice(0, VISIBLES).map(fila));
+      const resto = aspectos.slice(VISIBLES);
+      document.getElementById("r-aspectos-resto").replaceChildren(...resto.map(fila));
+      document.getElementById("r-aspectos-resumen").textContent = `Ver los ${aspectos.length} aspectos`;
+      document.getElementById("r-aspectos-mas").hidden = resto.length === 0;
+      document.getElementById("r-nota-asp").hidden = !aspectos.some((a) => a.puede_variar);
+    }
 
     const bloqueAng = document.getElementById("r-angulos-bloque");
     bloqueAng.hidden = !datos.angulos;
