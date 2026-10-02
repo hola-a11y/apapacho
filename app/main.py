@@ -25,7 +25,17 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app import rueda, service
-from app.schemas import CartaCompletaResponse, CartaRequest, CartaResponse, HealthResponse, RootResponse
+from app.schemas import (
+    CartaCompletaResponse,
+    CartaRequest,
+    CartaResponse,
+    HealthResponse,
+    RevolucionSolarRequest,
+    RevolucionSolarResponse,
+    RootResponse,
+    SinastriaRequest,
+    SinastriaResponse,
+)
 
 # ---------------------------------------------------------------------------
 # Configuración (solo variables de entorno; sin secretos en el código ni en la imagen)
@@ -251,3 +261,51 @@ def carta_rueda_svg(request: Request, datos: CartaRequest) -> Response:
         media_type="image/svg+xml",
         headers={"X-Content-Type-Options": "nosniff", "Content-Disposition": 'inline; filename="carta.svg"'},
     )
+
+
+ERRORES_CALCULO = (service.ZonaHorariaNoEncontrada, service.HoraInvalida, service.DatosInsuficientes)
+RESPUESTAS_COMUNES = {401: {"description": "API key ausente o incorrecta"}, 429: {"description": "Rate limit"}}
+
+
+def _datos_persona(datos: CartaRequest) -> dict:
+    return {
+        "year": datos.year, "month": datos.month, "day": datos.day,
+        "hour": datos.hour, "minute": datos.minute, "lat": datos.lat, "lng": datos.lng,
+    }
+
+
+@app.post(
+    "/revolucion-solar",
+    response_model=RevolucionSolarResponse,
+    dependencies=[Depends(requiere_api_key)],
+    tags=["carta"],
+    responses=RESPUESTAS_COMUNES,
+)
+@limiter.limit(RATE_LIMIT)
+def revolucion_solar(request: Request, datos: RevolucionSolarRequest) -> RevolucionSolarResponse:
+    """Carta del cumpleaños de `anio`: el instante exacto en que el Sol vuelve a su posición
+    natal, levantada en el lugar actual (o en el de nacimiento). Necesita la hora de nacimiento."""
+    try:
+        resultado = service.calcular_revolucion_solar(
+            **_datos_persona(datos), anio=datos.anio, lat_actual=datos.lat_actual, lng_actual=datos.lng_actual
+        )
+    except ERRORES_CALCULO as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    return RevolucionSolarResponse(**resultado, rueda_svg=rueda.generar_rueda(resultado))
+
+
+@app.post(
+    "/sinastria",
+    response_model=SinastriaResponse,
+    dependencies=[Depends(requiere_api_key)],
+    tags=["carta"],
+    responses=RESPUESTAS_COMUNES,
+)
+@limiter.limit(RATE_LIMIT)
+def sinastria(request: Request, datos: SinastriaRequest) -> SinastriaResponse:
+    """Aspectos entre las cartas de dos personas y una puntuación de afinidad de 0 a 100."""
+    try:
+        resultado = service.calcular_sinastria(_datos_persona(datos.persona_a), _datos_persona(datos.persona_b))
+    except ERRORES_CALCULO as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    return SinastriaResponse(**resultado)

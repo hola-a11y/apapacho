@@ -148,3 +148,80 @@ class CartaCompletaResponse(CartaResponse):
     rueda_svg: str = Field(
         ..., description="Rueda zodiacal en SVG (texto). Sin scripts ni recursos externos."
     )
+
+
+# ---------------------------------------------------------------------------
+# Revolución solar
+# ---------------------------------------------------------------------------
+
+
+class RevolucionSolarRequest(CartaRequest):
+    anio: int = Field(..., ge=1900, le=2100, description="Año de la revolución solar")
+    lat_actual: Optional[float] = Field(
+        None, ge=-90, le=90, description="Latitud donde se pasa el cumpleaños. Por defecto, la de nacimiento."
+    )
+    lng_actual: Optional[float] = Field(
+        None, ge=-180, le=180, description="Longitud donde se pasa el cumpleaños. Por defecto, la de nacimiento."
+    )
+
+    @model_validator(mode="after")
+    def _validar_lugar_actual(self) -> "RevolucionSolarRequest":
+        if (self.lat_actual is None) != (self.lng_actual is None):
+            raise ValueError("lat_actual y lng_actual van juntas: indica ambas o ninguna")
+        return self
+
+
+class RevolucionSolarResponse(CartaCompletaResponse):
+    anio: int
+    momento_utc: str = Field(..., description="Instante exacto en que el Sol vuelve a su posición natal (ISO 8601, UTC)")
+    momento_local: str = Field(..., description="El mismo instante en la hora local del lugar de la revolución")
+    zona_horaria: str = Field(..., description="Zona horaria IANA del lugar de la revolución")
+    sol_natal: PosicionSigno
+
+
+# ---------------------------------------------------------------------------
+# Sinastría
+# ---------------------------------------------------------------------------
+
+
+class SinastriaRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    persona_a: CartaRequest
+    persona_b: CartaRequest
+
+
+class ResumenPersona(BaseModel):
+    sol: str
+    luna: str
+    ascendente: Optional[str]
+    hora_exacta: bool
+    luna_puede_variar: bool
+
+
+class AspectoSinastria(BaseModel):
+    a: str = Field(..., description="Planeta o Ascendente de la persona A")
+    b: str = Field(..., description="Planeta o Ascendente de la persona B")
+    tipo: str
+    armonico: Optional[bool]
+    angulo: float
+    orbe: float
+    orbe_texto: str
+    puede_variar: bool = Field(..., description="true si, por faltar una hora, el aspecto puede no darse")
+    generacional: bool = Field(..., description="Entre Urano, Neptuno y Plutón: no cuenta en la puntuación")
+    peso: float = Field(..., description="Contribución a la puntuación (positiva o negativa)")
+
+
+class ResumenSinastria(BaseModel):
+    armonicos: int
+    tensos: int
+    conjunciones: int
+    puntuacion_bruta: float
+
+
+class SinastriaResponse(BaseModel):
+    persona_a: ResumenPersona
+    persona_b: ResumenPersona
+    aspectos: list[AspectoSinastria] = Field(..., description="Ordenados por orbe")
+    puntuacion: int = Field(..., ge=0, le=100, description="Afinidad de 0 a 100 (50 = pareja típica)")
+    resumen: ResumenSinastria

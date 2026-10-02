@@ -90,6 +90,60 @@ Colores: fondo `#0f1829`, líneas `#c9a15e`, texto `#f6f1e7`, fuego `#f0a07a`, t
 aire `#9fc6ef` y agua `#8fb3e8`. Aspectos armónicos en azul, tensos en naranja, sextiles con
 línea discontinua. Las conjunciones no se dibujan porque los puntos coinciden.
 
+### Revolución solar
+
+`POST /revolucion-solar` recibe los datos de nacimiento, **con hora obligatoria**, más:
+
+```json
+{ "anio": 2026, "lat_actual": 19.4326, "lng_actual": -99.1332 }
+```
+
+`lat_actual` y `lng_actual` son el lugar donde se pasa el cumpleaños. Son opcionales, pero van
+juntas; si se omiten se usa el lugar de nacimiento. Calcula el instante exacto en que el Sol
+vuelve a su longitud natal durante `anio` (en UTC) y devuelve la carta completa de ese
+instante, con rueda incluida, más `anio`, `momento_utc`, `momento_local`, `zona_horaria` y
+`sol_natal`.
+
+Sin hora de nacimiento responde 422: el Sol natal tendría medio grado de incertidumbre y el
+momento de la revolución, doce horas, así que ascendente y casas no servirían.
+
+### Sinastría
+
+`POST /sinastria` recibe dos personas con el mismo formato que `/carta`:
+
+```json
+{ "persona_a": { "year": 1990, "month": 7, "day": 15, "hour": 14, "minute": 30, "lat": 40.4168, "lng": -3.7038 },
+  "persona_b": { "year": 1988, "month": 3, "day": 2, "lat": 19.4326, "lng": -99.1332 } }
+```
+
+Devuelve el resumen de cada persona (`sol`, `luna`, `ascendente`...), los `aspectos` entre las
+dos cartas ordenados por orbe, una `puntuacion` de 0 a 100 y un `resumen` con el número de
+aspectos armónicos, tensos y conjunciones. En cada aspecto, `a` es el punto de la persona A y
+`b` el de la persona B.
+
+Puntos: los diez planetas de cada persona, más su Ascendente si tiene hora. Orbes 2° más
+estrechos que en la carta natal: 6°, o 4° en el sextil, y 8° si interviene el Sol o la Luna.
+
+**Cómo se calcula la puntuación.** Cada aspecto suma o resta:
+
+```
+peso = tipo × importancia × (0,5 + 0,5 × exactitud) × (0,5 si puede_variar)
+```
+
+- **tipo**: trígono +3, sextil +2, cuadratura −2, oposición −1,5. Conjunción +2,5 si une dos
+  puntos de {Sol, Luna, Venus, Júpiter, Ascendente}, −1,5 si interviene Saturno o Plutón, y +1
+  en el resto.
+- **importancia**: media de los dos puntos. Sol, Luna, Venus, Marte y Ascendente valen 1,5.
+  Mercurio, Júpiter y Saturno, 1. Urano, Neptuno y Plutón, 0,5.
+- **exactitud**: 1 con el aspecto exacto y 0 en el límite del orbe.
+- **Aspectos generacionales**, entre Urano, Neptuno y Plutón de ambas personas, pesan 0: los
+  comparte toda la gente de edad parecida.
+
+La suma bruta se convierte a 0-100 con `50 + 50 × tanh((bruto − 13,5) / 21)`. Las constantes se
+calibraron con 400 parejas aleatorias nacidas entre 1950 y 2005: la pareja mediana obtiene 50,
+el 10 % con menos afinidad unos 21 y el 10 % con más, unos 80. Es un indicador orientativo para
+un uso lúdico. Cada aspecto trae su `peso`, así que la puntuación se puede auditar.
+
 Otros endpoints:
 
 | Método | Ruta | Auth | Descripción |
@@ -100,6 +154,8 @@ Otros endpoints:
 | POST | `/carta` | `X-API-Key` | Sol, Luna y Ascendente |
 | POST | `/carta/completa` | `X-API-Key` | Carta natal completa |
 | POST | `/carta/rueda.svg` | `X-API-Key` | Rueda zodiacal en SVG |
+| POST | `/revolucion-solar` | `X-API-Key` | Carta del cumpleaños de un año |
+| POST | `/sinastria` | `X-API-Key` | Aspectos y afinidad entre dos cartas |
 
 Errores: `401` API key ausente o incorrecta · `422` validación · `429` rate limit.
 
@@ -196,7 +252,8 @@ Cubre: hora ausente (y detección de cambio de signo lunar), validación de rang
 auth faltante/incorrecta, rate limit, CORS cerrado, zona horaria con horario de verano
 histórico (Ciudad de México 2010 vs 2024, Madrid 1950 vs 1990), que los logs no contienen
 datos de nacimiento, la carta completa con valores conocidos de julio de 1990, los aspectos y
-sus orbes, y que la rueda SVG es válida y no contiene scripts ni recursos externos.
+sus orbes, que la rueda SVG es válida y no contiene scripts ni recursos externos, la revolución
+solar (incluido quien nació un 29 de febrero) y la sinastría (simetría, pesos y caso sin hora).
 
 ### Cartas de referencia (astro.com)
 
