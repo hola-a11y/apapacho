@@ -64,3 +64,64 @@ class RootResponse(BaseModel):
     license: str
     source: str
     docs: str
+
+
+# ---------------------------------------------------------------------------
+# Carta completa
+# ---------------------------------------------------------------------------
+
+
+class PosicionSigno(BaseModel):
+    signo: str = Field(..., description="Signo en español")
+    grado: float = Field(..., description="Grado dentro del signo (0-30)")
+    grado_texto: str = Field(..., description='Grado en grados y minutos, p. ej. "22°45′"')
+
+
+class Planeta(PosicionSigno):
+    clave: str = Field(..., description="Identificador estable: sol, luna, mercurio... nodo_norte, quiron")
+    nombre: str = Field(..., description="Nombre en español")
+    casa: Optional[int] = Field(None, ge=1, le=12, description="Casa (1-12). null si no hay hora.")
+    retrogrado: bool
+    puede_variar: bool = Field(
+        ..., description="Sin hora: true si el punto cambia de signo durante ese día. Con hora: false."
+    )
+
+
+class Angulos(BaseModel):
+    ascendente: PosicionSigno
+    medio_cielo: PosicionSigno
+
+
+class Casa(PosicionSigno):
+    numero: int = Field(..., ge=1, le=12)
+
+
+class Elementos(BaseModel):
+    fuego: int
+    tierra: int
+    aire: int
+    agua: int
+
+
+class Modalidades(BaseModel):
+    cardinal: int
+    fijo: int
+    mutable: int
+
+
+class FaseLunar(BaseModel):
+    nombre: str = Field(..., description="Luna nueva, Luna creciente, Cuarto creciente, Gibosa creciente, "
+                        "Luna llena, Gibosa menguante, Cuarto menguante o Luna menguante")
+    angulo: float = Field(..., description="Elongación Luna-Sol en grados (0 = nueva, 180 = llena)")
+    iluminacion: float = Field(..., description="Porcentaje iluminado del disco lunar")
+
+
+class CartaCompletaResponse(CartaResponse):
+    """Incluye los mismos campos que /carta, más la carta completa."""
+
+    planetas: list[Planeta] = Field(..., description="Sol a Plutón, Nodo Norte (verdadero) y Quirón")
+    angulos: Optional[Angulos] = Field(None, description="null si no hay hora")
+    casas: Optional[list[Casa]] = Field(None, description="12 casas Placidus. null si no hay hora")
+    elementos: Elementos = Field(..., description="Recuento de Sol a Plutón, más el ascendente si hay hora")
+    modalidades: Modalidades = Field(..., description="Recuento de Sol a Plutón, más el ascendente si hay hora")
+    fase_lunar: FaseLunar

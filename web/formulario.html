@@ -49,6 +49,7 @@
     }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0;
     background: var(--bg);
@@ -115,7 +116,42 @@
   .resultado dt { color: var(--muted); }
   .resultado dd { margin: 0; font-weight: 700; font-size: 1.125rem; }
   .nota { background: var(--note-bg); border-radius: 8px; padding: .75rem 1rem; margin: 1rem 0 0; }
+  .resultado .tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: 0; }
+  .tres div {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: .9rem .5rem;
+    text-align: center;
+  }
+  .tres dt { color: var(--muted); font-size: .875rem; }
+  .resultado .tres dd { font-weight: 400; font-size: 1rem; }
+  .tres dd { margin: .25rem 0 0; }
+  .glifo { display: block; font-size: 2.25rem; line-height: 1.1; color: var(--accent); }
+  .signo { display: block; font-weight: 700; font-size: 1.0625rem; }
+  .grado { display: block; color: var(--muted); font-size: .875rem; }
+  .bloque { margin-top: 1.75rem; }
+  .bloque h3 { font-size: 1.0625rem; margin: 0 0 .6rem; }
+  .tabla-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; }
+  th, td { text-align: left; padding: .45rem .4rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td .glifo-mini { color: var(--accent); margin-right: .3rem; }
+  .barras { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+  .barras li { display: grid; grid-template-columns: 6.5rem 1fr 1.5rem; gap: .6rem; align-items: center; }
+  .barra { height: .7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 99px; overflow: hidden; }
+  .barra span { display: block; height: 100%; background: var(--accent); }
+  .num { text-align: right; font-weight: 700; }
+  .fase { display: flex; align-items: center; gap: .9rem; }
+  .fase .glifo { font-size: 2rem; }
   .pie { color: var(--muted); font-size: .875rem; margin-top: 2rem; }
+  @media (max-width: 420px) {
+    form, .resultado { padding: 1.1rem; }
+    table { font-size: .875rem; }
+    th, td { padding: .4rem .2rem; }
+    .glifo { font-size: 1.9rem; }
+    .signo { font-size: .9375rem; }
+  }
   .pie a { color: inherit; }
   @media (prefers-reduced-motion: no-preference) {
     button { transition: opacity .15s ease; }
@@ -162,17 +198,56 @@
 
   <section id="resultado" class="resultado" tabindex="-1" aria-labelledby="resultado-titulo" hidden>
     <h2 id="resultado-titulo">Tu carta</h2>
-    <dl>
-      <dt>Sol</dt><dd id="r-sol"></dd>
-      <dt>Luna</dt><dd id="r-luna"></dd>
-      <dt>Ascendente</dt><dd id="r-asc"></dd>
+
+    <dl class="tres">
+      <div><dt>Sol</dt><dd id="r-sol"></dd></div>
+      <div><dt>Luna</dt><dd id="r-luna"></dd></div>
+      <div><dt>Ascendente</dt><dd id="r-asc"></dd></div>
     </dl>
     <p id="r-nota-luna" class="nota" hidden>
       Sin la hora exacta, la Luna podría estar en el signo contiguo: ese día cambió de signo.
     </p>
     <p id="r-nota-asc" class="nota" hidden>
-      Para conocer tu ascendente necesitamos la hora de nacimiento.
+      Para conocer tu ascendente y tus casas necesitamos la hora de nacimiento.
     </p>
+
+    <!-- Carta completa: se muestra solo si la respuesta incluye estos datos (/carta/completa). -->
+    <div id="r-completa" hidden>
+      <div class="bloque">
+        <h3>Planetas</h3>
+        <div class="tabla-wrap">
+          <table>
+            <caption class="trampa">Posición de cada planeta</caption>
+            <thead>
+              <tr><th scope="col">Planeta</th><th scope="col">Signo</th><th scope="col">Grado</th><th scope="col" id="th-casa">Casa</th></tr>
+            </thead>
+            <tbody id="r-planetas"></tbody>
+          </table>
+        </div>
+        <p id="r-nota-retro" class="ayuda" hidden>℞ = retrógrado.</p>
+        <p id="r-nota-varia" class="ayuda" hidden>* Sin la hora exacta, este punto podría estar en el signo contiguo.</p>
+      </div>
+
+      <div class="bloque" id="r-angulos-bloque" hidden>
+        <h3>Ángulos</h3>
+        <p id="r-angulos"></p>
+      </div>
+
+      <div class="bloque">
+        <h3>Elementos</h3>
+        <ul class="barras" id="r-elementos"></ul>
+      </div>
+
+      <div class="bloque">
+        <h3>Modalidades</h3>
+        <ul class="barras" id="r-modalidades"></ul>
+      </div>
+
+      <div class="bloque">
+        <h3>Fase lunar al nacer</h3>
+        <p class="fase"><span class="glifo" id="r-fase-glifo" aria-hidden="true"></span><span id="r-fase"></span></p>
+      </div>
+    </div>
   </section>
 
   <p class="pie">
@@ -191,6 +266,116 @@
   const hora = document.getElementById("hora");
   const sinHora = document.getElementById("sin-hora");
   const resultado = document.getElementById("resultado");
+
+  const GLIFOS = {
+    "Aries": "\u2648", "Tauro": "\u2649", "Géminis": "\u264A", "Cáncer": "\u264B",
+    "Leo": "\u264C", "Virgo": "\u264D", "Libra": "\u264E", "Escorpio": "\u264F",
+    "Sagitario": "\u2650", "Capricornio": "\u2651", "Acuario": "\u2652", "Piscis": "\u2653",
+  };
+  const VS_TEXTO = "\uFE0E"; // fuerza el símbolo como texto, no como emoji
+  const FASES = {
+    "Luna nueva": "\u{1F311}", "Luna creciente": "\u{1F312}", "Cuarto creciente": "\u{1F313}",
+    "Gibosa creciente": "\u{1F314}", "Luna llena": "\u{1F315}", "Gibosa menguante": "\u{1F316}",
+    "Cuarto menguante": "\u{1F317}", "Luna menguante": "\u{1F318}",
+  };
+
+  function el(etiqueta, props = {}, hijos = []) {
+    const nodo = document.createElement(etiqueta);
+    Object.assign(nodo, props);
+    for (const h of hijos) nodo.append(h);
+    return nodo;
+  }
+
+  function glifo(signo, clase = "glifo") {
+    return el("span", { className: clase, textContent: (GLIFOS[signo] || "") + VS_TEXTO, ariaHidden: "true" });
+  }
+
+  // Tarjeta de Sol, Luna o Ascendente. `grado` es opcional.
+  function pintarGrande(id, signo, grado) {
+    const dd = document.getElementById(id);
+    dd.replaceChildren();
+    if (!signo) {
+      dd.append(el("span", { className: "signo", textContent: "—" }),
+                el("span", { className: "grado", textContent: "Falta la hora" }));
+      return;
+    }
+    dd.append(glifo(signo), el("span", { className: "signo", textContent: signo }));
+    if (grado) dd.append(el("span", { className: "grado", textContent: grado }));
+  }
+
+  function pintarBarras(id, datos, nombres) {
+    const lista = document.getElementById(id);
+    const total = Object.values(datos).reduce((a, b) => a + b, 0) || 1;
+    lista.replaceChildren();
+    for (const [clave, nombre] of nombres) {
+      const valor = datos[clave] || 0;
+      const relleno = el("span");
+      relleno.style.width = (valor / total * 100) + "%";
+      lista.append(el("li", {}, [
+        el("span", { textContent: nombre }),
+        el("span", { className: "barra", ariaHidden: "true" }, [relleno]),
+        el("span", { className: "num", textContent: String(valor) }),
+      ]));
+    }
+  }
+
+  function pintarResultado(datos) {
+    const planetas = Array.isArray(datos.planetas) ? datos.planetas : null;
+    const buscar = (clave) => planetas && planetas.find((p) => p.clave === clave);
+    const asc = datos.angulos && datos.angulos.ascendente;
+
+    pintarGrande("r-sol", datos.sol, buscar("sol") && buscar("sol").grado_texto);
+    pintarGrande("r-luna", datos.luna, buscar("luna") && buscar("luna").grado_texto);
+    pintarGrande("r-asc", datos.ascendente, asc && asc.grado_texto);
+    document.getElementById("r-nota-luna").hidden = !datos.luna_puede_variar;
+    document.getElementById("r-nota-asc").hidden = Boolean(datos.ascendente);
+
+    const completa = document.getElementById("r-completa");
+    if (!planetas) { completa.hidden = true; return; }
+
+    const conCasas = planetas.some((p) => p.casa);
+    document.getElementById("th-casa").hidden = !conCasas;
+    const cuerpo = document.getElementById("r-planetas");
+    cuerpo.replaceChildren();
+    let hayRetro = false, hayVaria = false;
+    for (const p of planetas) {
+      hayRetro = hayRetro || p.retrogrado;
+      hayVaria = hayVaria || p.puede_variar;
+      const nombre = p.nombre + (p.retrogrado ? " ℞" : "") + (p.puede_variar ? " *" : "");
+      const fila = el("tr", {}, [
+        el("th", { scope: "row", textContent: nombre }),
+        el("td", {}, [glifo(p.signo, "glifo-mini"), p.signo]),
+        el("td", { textContent: p.grado_texto }),
+      ]);
+      if (conCasas) fila.append(el("td", { textContent: p.casa ? String(p.casa) : "—" }));
+      cuerpo.append(fila);
+    }
+    document.getElementById("r-nota-retro").hidden = !hayRetro;
+    document.getElementById("r-nota-varia").hidden = !hayVaria;
+
+    const bloqueAng = document.getElementById("r-angulos-bloque");
+    bloqueAng.hidden = !datos.angulos;
+    if (datos.angulos) {
+      const mc = datos.angulos.medio_cielo;
+      document.getElementById("r-angulos").textContent =
+        `Ascendente en ${asc.signo} ${asc.grado_texto} · Medio Cielo en ${mc.signo} ${mc.grado_texto}`;
+    }
+
+    if (datos.elementos) {
+      pintarBarras("r-elementos", datos.elementos,
+        [["fuego", "Fuego"], ["tierra", "Tierra"], ["aire", "Aire"], ["agua", "Agua"]]);
+    }
+    if (datos.modalidades) {
+      pintarBarras("r-modalidades", datos.modalidades,
+        [["cardinal", "Cardinal"], ["fijo", "Fijo"], ["mutable", "Mutable"]]);
+    }
+    if (datos.fase_lunar) {
+      document.getElementById("r-fase-glifo").textContent = FASES[datos.fase_lunar.nombre] || "";
+      document.getElementById("r-fase").textContent =
+        `${datos.fase_lunar.nombre} (${Math.round(datos.fase_lunar.iluminacion)} % iluminada)`;
+    }
+    completa.hidden = false;
+  }
 
   sinHora.addEventListener("change", () => {
     hora.disabled = sinHora.checked;
@@ -260,11 +445,10 @@
         return mostrarError("No hemos podido hacer el cálculo ahora. Inténtalo de nuevo en un minuto.");
       }
 
-      document.getElementById("r-sol").textContent = datos.sol;
-      document.getElementById("r-luna").textContent = datos.luna;
-      document.getElementById("r-asc").textContent = datos.ascendente || "Sin hora, no disponible";
-      document.getElementById("r-nota-luna").hidden = !datos.luna_puede_variar;
-      document.getElementById("r-nota-asc").hidden = Boolean(datos.ascendente);
+      if (!datos || !datos.sol) {
+        return mostrarError("No hemos podido hacer el cálculo ahora. Inténtalo de nuevo en un minuto.");
+      }
+      pintarResultado(datos);
       resultado.hidden = false;
       resultado.focus();
     } catch (_) {

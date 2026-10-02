@@ -9,6 +9,7 @@ cada uno con `sign` (abreviatura de 3 letras) y `sign_num` (0 = Aries ... 11 = P
 from __future__ import annotations
 
 import logging
+import math
 import threading
 from dataclasses import dataclass
 from typing import Optional
@@ -87,7 +88,7 @@ def zona_horaria(lat: float, lng: float) -> str:
     return tz
 
 
-def _calcular(
+def _sujeto(
     year: int,
     month: int,
     day: int,
@@ -96,9 +97,9 @@ def _calcular(
     lat: float,
     lng: float,
     tz_str: str,
-    con_ascendente: bool,
-) -> Posiciones:
-    puntos = ["Sun", "Moon", "Ascendant"] if con_ascendente else ["Sun", "Moon"]
+    puntos: list[str],
+):
+    """Crea el AstrologicalSubjectModel de Kerykeion para una fecha/hora local."""
     kwargs = dict(
         name="-",  # Nunca pasamos datos identificativos a la librería.
         year=year,
@@ -117,7 +118,7 @@ def _calcular(
 
     with _swe_lock:
         try:
-            subject = AstrologicalSubjectFactory.from_birth_data(**kwargs)
+            return AstrologicalSubjectFactory.from_birth_data(**kwargs)
         except KerykeionException as exc:
             # pytz lanza error si la hora local es ambigua (cambio a horario de invierno:
             # la hora ocurre dos veces) o inexistente (cambio a horario de verano: la hora
@@ -125,9 +126,23 @@ def _calcular(
             # que es el criterio habitual de los programas de astrología.
             texto = str(exc)
             if "Ambiguous" in texto or "Non-existent" in texto:
-                subject = AstrologicalSubjectFactory.from_birth_data(is_dst=False, **kwargs)
-            else:
-                raise HoraInvalida("No se pudo interpretar la hora local") from exc
+                return AstrologicalSubjectFactory.from_birth_data(is_dst=False, **kwargs)
+            raise HoraInvalida("No se pudo interpretar la hora local") from exc
+
+
+def _calcular(
+    year: int,
+    month: int,
+    day: int,
+    hour: int,
+    minute: int,
+    lat: float,
+    lng: float,
+    tz_str: str,
+    con_ascendente: bool,
+) -> Posiciones:
+    puntos = ["Sun", "Moon", "Ascendant"] if con_ascendente else ["Sun", "Moon"]
+    subject = _sujeto(year, month, day, hour, minute, lat, lng, tz_str, puntos)
 
     asc_num = None
     if con_ascendente:
@@ -185,3 +200,161 @@ def calcular_carta(
         luna_puede_variar=False,
         zona_horaria=tz,
     )
+
+
+# ---------------------------------------------------------------------------
+# Carta completa
+# ---------------------------------------------------------------------------
+
+# (clave en la API, nombre en español, nombre en Kerykeion, atributo del modelo)
+PUNTOS_CARTA: tuple[tuple[str, str, str, str], ...] = (
+    ("sol", "Sol", "Sun", "sun"),
+    ("luna", "Luna", "Moon", "moon"),
+    ("mercurio", "Mercurio", "Mercury", "mercury"),
+    ("venus", "Venus", "Venus", "venus"),
+    ("marte", "Marte", "Mars", "mars"),
+    ("jupiter", "Júpiter", "Jupiter", "jupiter"),
+    ("saturno", "Saturno", "Saturn", "saturn"),
+    ("urano", "Urano", "Uranus", "uranus"),
+    ("neptuno", "Neptuno", "Neptune", "neptune"),
+    ("pluton", "Plutón", "Pluto", "pluto"),
+    ("nodo_norte", "Nodo Norte", "True_North_Lunar_Node", "true_north_lunar_node"),
+    ("quiron", "Quirón", "Chiron", "chiron"),
+)
+
+# Solo los diez planetas clásicos (y el ascendente, si hay hora) cuentan para el reparto
+# de elementos y modalidades. Nodo Norte y Quirón no.
+CLAVES_REPARTO = ("sol", "luna", "mercurio", "venus", "marte", "jupiter", "saturno", "urano", "neptuno", "pluton")
+
+ELEMENTOS = ("fuego", "tierra", "aire", "agua")  # Aries=fuego, Tauro=tierra, Géminis=aire, Cáncer=agua...
+MODALIDADES = ("cardinal", "fijo", "mutable")  # Aries=cardinal, Tauro=fijo, Géminis=mutable...
+
+ATRIBUTOS_CASAS = (
+    "first_house", "second_house", "third_house", "fourth_house", "fifth_house", "sixth_house",
+    "seventh_house", "eighth_house", "ninth_house", "tenth_house", "eleventh_house", "twelfth_house",
+)
+_NUMERO_CASA = {
+    "First_House": 1, "Second_House": 2, "Third_House": 3, "Fourth_House": 4,
+    "Fifth_House": 5, "Sixth_House": 6, "Seventh_House": 7, "Eighth_House": 8,
+    "Ninth_House": 9, "Tenth_House": 10, "Eleventh_House": 11, "Twelfth_House": 12,
+}
+
+FASES_LUNARES = (
+    "Luna nueva",
+    "Luna creciente",
+    "Cuarto creciente",
+    "Gibosa creciente",
+    "Luna llena",
+    "Gibosa menguante",
+    "Cuarto menguante",
+    "Luna menguante",
+)
+
+
+def grado_texto(grado: float) -> str:
+    """22.75 -> "22°45′" (grados y minutos dentro del signo)."""
+    total_minutos = int(round(grado * 60))
+    g, m = divmod(total_minutos, 60)
+    if g >= 30:  # redondeo en el límite del signo
+        g, m = 29, 59
+    return f"{g}°{m:02d}′"
+
+
+def fase_lunar(sol_abs: float, luna_abs: float) -> dict:
+    """Fase lunar a partir de la elongación Luna-Sol (0° = nueva, 180° = llena)."""
+    angulo = (luna_abs - sol_abs) % 360
+    indice = int(((angulo + 22.5) % 360) // 45)
+    iluminacion = (1 - math.cos(math.radians(angulo))) / 2 * 100
+    return {
+        "nombre": FASES_LUNARES[indice],
+        "angulo": round(angulo, 2),
+        "iluminacion": round(iluminacion, 1),
+    }
+
+
+def _signo(sign_num: int, grado: float) -> dict:
+    return {"signo": SIGNOS_ES[sign_num], "grado": round(grado, 2), "grado_texto": grado_texto(grado)}
+
+
+def calcular_carta_completa(
+    year: int,
+    month: int,
+    day: int,
+    lat: float,
+    lng: float,
+    hour: Optional[int] = None,
+    minute: Optional[int] = None,
+) -> dict:
+    """Carta natal completa: planetas, nodo norte, Quirón, ángulos, casas, elementos,
+    modalidades y fase lunar.
+
+    Sin hora: todo se calcula a las 12:00 locales; ascendente, medio cielo, casas y la casa de
+    cada planeta son None, y cada planeta indica `puede_variar` si cambia de signo ese día.
+    """
+    tz = zona_horaria(lat, lng)
+    hora_exacta = hour is not None
+    claves_kerykeion = [p[2] for p in PUNTOS_CARTA]
+
+    if hora_exacta:
+        principal = _sujeto(year, month, day, hour, minute or 0, lat, lng, tz,
+                            claves_kerykeion + ["Ascendant", "Medium_Coeli"])
+        inicio = fin = None
+    else:
+        principal = _sujeto(year, month, day, HORA_POR_DEFECTO, MINUTO_POR_DEFECTO, lat, lng, tz, claves_kerykeion)
+        inicio = _sujeto(year, month, day, 0, 0, lat, lng, tz, claves_kerykeion)
+        fin = _sujeto(year, month, day, 23, 59, lat, lng, tz, claves_kerykeion)
+
+    planetas = []
+    for clave, nombre, _, atributo in PUNTOS_CARTA:
+        punto = getattr(principal, atributo)
+        if punto is None:
+            raise HoraInvalida(f"No se pudo calcular {nombre}")
+        puede_variar = False
+        if not hora_exacta:
+            puede_variar = getattr(inicio, atributo).sign_num != getattr(fin, atributo).sign_num
+        planetas.append({
+            "clave": clave,
+            "nombre": nombre,
+            **_signo(punto.sign_num, punto.position),
+            "casa": _NUMERO_CASA.get(punto.house) if hora_exacta else None,
+            "retrogrado": bool(punto.retrograde),
+            "puede_variar": puede_variar,
+        })
+
+    angulos = None
+    casas = None
+    if hora_exacta:
+        if principal.ascendant is None or principal.medium_coeli is None:
+            raise HoraInvalida("No se pudieron calcular los ángulos")
+        angulos = {
+            "ascendente": _signo(principal.ascendant.sign_num, principal.ascendant.position),
+            "medio_cielo": _signo(principal.medium_coeli.sign_num, principal.medium_coeli.position),
+        }
+        casas = []
+        for numero, atributo in enumerate(ATRIBUTOS_CASAS, start=1):
+            cuspide = getattr(principal, atributo)
+            casas.append({"numero": numero, **_signo(cuspide.sign_num, cuspide.position)})
+
+    signos_reparto = [p.sign_num for p in (getattr(principal, a) for c, _, _, a in PUNTOS_CARTA if c in CLAVES_REPARTO)]
+    if hora_exacta:
+        signos_reparto.append(principal.ascendant.sign_num)
+    elementos = {e: 0 for e in ELEMENTOS}
+    modalidades = {m: 0 for m in MODALIDADES}
+    for n in signos_reparto:
+        elementos[ELEMENTOS[n % 4]] += 1
+        modalidades[MODALIDADES[n % 3]] += 1
+
+    por_clave = {p["clave"]: p for p in planetas}
+    return {
+        "sol": por_clave["sol"]["signo"],
+        "luna": por_clave["luna"]["signo"],
+        "ascendente": angulos["ascendente"]["signo"] if angulos else None,
+        "hora_exacta": hora_exacta,
+        "luna_puede_variar": por_clave["luna"]["puede_variar"],
+        "planetas": planetas,
+        "angulos": angulos,
+        "casas": casas,
+        "elementos": elementos,
+        "modalidades": modalidades,
+        "fase_lunar": fase_lunar(principal.sun.abs_pos, principal.moon.abs_pos),
+    }

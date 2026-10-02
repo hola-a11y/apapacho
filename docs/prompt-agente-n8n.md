@@ -21,7 +21,7 @@ funciona; tu trabajo es solo el workflow y conectar el formulario HTML.
 
 ## API de apapacho
 
-`POST http://apapacho:8000/carta` con header `X-API-Key` (la credencial) y cuerpo JSON:
+`POST http://apapacho:8000/carta/completa` con header `X-API-Key` (la credencial) y cuerpo JSON:
 
 ```json
 { "year": 1990, "month": 7, "day": 15, "hour": 14, "minute": 30, "lat": 40.4168, "lng": -3.7038 }
@@ -29,8 +29,9 @@ funciona; tu trabajo es solo el workflow y conectar el formulario HTML.
 
 - `hour` y `minute` pueden ser `null` si no se conoce la hora. Nunca `""` ni `0` en su lugar.
 - `lat` y `lng` deben ser números, no texto.
-- Respuesta 200:
-  `{"sol":"Cáncer","luna":"Aries","ascendente":"Libra","hora_exacta":true,"luna_puede_variar":false}`
+- Respuesta 200: `sol`, `luna`, `ascendente`, `hora_exacta`, `luna_puede_variar`, y además
+  `planetas`, `angulos`, `casas`, `elementos`, `modalidades` y `fase_lunar`. El formulario usa
+  todos esos campos: devuélvelos tal cual, sin filtrar.
 - Errores: 401 clave incorrecta, 422 datos inválidos, 429 más de 30 peticiones por minuto.
 
 ## Lo que envía el formulario
@@ -55,11 +56,15 @@ Nombre: `Apapacho - Carta`.
    - Si no: **Respond to Webhook** con código **400** y JSON `{"error":"datos_incompletos"}`.
 3. **HTTP Request "Nominatim"**: `GET https://nominatim.openstreetmap.org/search` con query
    `q` = la ciudad, `format` = `json`, `limit` = `1`, y header
-   `User-Agent: apapacho/1.0 (<mi correo de contacto>)`. Activa **Always Output Data** en
-   Settings para que una ciudad inexistente no corte el flujo.
-4. **IF "Ciudad encontrada"**: `$json.lat` no vacío.
+   `User-Agent: apapacho/1.0 (<mi correo de contacto>)`. En Options → Response activa
+   **Include Response Headers and Status** (respuesta completa), para que una ciudad
+   inexistente llegue como `body: []` en un item en vez de cortar el flujo. No uses
+   *Always Output Data*: haría que un fallo de conexión parezca una ciudad inexistente.
+   En Settings, **On Error** = `Continue (using error output)`.
+   - Salida de error: **Respond to Webhook** con código **502** y JSON `{"error":"geocodificacion"}`.
+4. **IF "Ciudad encontrada"**: `$json.body[0].lat` existe y no está vacío.
    - Si no: **Respond to Webhook** con código **422** y JSON `{"error":"ciudad_no_encontrada"}`.
-5. **HTTP Request "apapacho"**: `POST http://apapacho:8000/carta`, autenticación Generic
+5. **HTTP Request "apapacho"**: `POST http://apapacho:8000/carta/completa`, autenticación Generic
    Credential Type, Header Auth, credencial `Apapachoapp`. Body JSON con esta expresión
    (ajusta el nombre del nodo Webhook si es distinto):
 
@@ -70,8 +75,8 @@ Nombre: `Apapacho - Carta`.
      day: Number($('Webhook').item.json.body.fecha.split('-')[2]),
      hour: $('Webhook').item.json.body.hora ? Number($('Webhook').item.json.body.hora.split(':')[0]) : null,
      minute: $('Webhook').item.json.body.hora ? Number($('Webhook').item.json.body.hora.split(':')[1]) : null,
-     lat: Number($json.lat),
-     lng: Number($json.lon)
+     lat: Number($json.body[0].lat),
+     lng: Number($json.body[0].lon)
    }) }}
    ```
 

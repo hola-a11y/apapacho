@@ -25,7 +25,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app import service
-from app.schemas import CartaRequest, CartaResponse, HealthResponse, RootResponse
+from app.schemas import CartaCompletaResponse, CartaRequest, CartaResponse, HealthResponse, RootResponse
 
 # ---------------------------------------------------------------------------
 # Configuración (solo variables de entorno; sin secretos en el código ni en la imagen)
@@ -187,3 +187,31 @@ def carta(request: Request, datos: CartaRequest) -> CartaResponse:
         hora_exacta=resultado.hora_exacta,
         luna_puede_variar=resultado.luna_puede_variar,
     )
+
+
+@app.post(
+    "/carta/completa",
+    response_model=CartaCompletaResponse,
+    dependencies=[Depends(requiere_api_key)],
+    tags=["carta"],
+    responses={401: {"description": "API key ausente o incorrecta"}, 429: {"description": "Rate limit"}},
+)
+@limiter.limit(RATE_LIMIT)
+def carta_completa(request: Request, datos: CartaRequest) -> CartaCompletaResponse:
+    """Carta natal completa: planetas, ángulos, casas, elementos, modalidades y fase lunar.
+
+    Incluye también los campos de /carta, así que sirve como sustituto directo.
+    """
+    try:
+        resultado = service.calcular_carta_completa(
+            year=datos.year,
+            month=datos.month,
+            day=datos.day,
+            hour=datos.hour,
+            minute=datos.minute,
+            lat=datos.lat,
+            lng=datos.lng,
+        )
+    except (service.ZonaHorariaNoEncontrada, service.HoraInvalida) as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    return CartaCompletaResponse(**resultado)

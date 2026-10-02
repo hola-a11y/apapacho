@@ -14,7 +14,10 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [0, 300],
+      "position": [
+        0,
+        300
+      ],
       "webhookId": "5d8e2f6a-7b3c-4e1d-9a2b-apapacho0001"
     },
     {
@@ -31,19 +34,30 @@
               "id": "c1",
               "leftValue": "={{ ($json.body.ciudad || '').toString().trim() }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
             },
             {
               "id": "c2",
               "leftValue": "={{ ($json.body.fecha || '').toString() }}",
               "rightValue": "^\\d{4}-\\d{2}-\\d{2}$",
-              "operator": { "type": "string", "operation": "regex" }
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
             },
             {
               "id": "c3",
               "leftValue": "={{ ($json.body.website || '').toString() }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "empty", "singleValue": true }
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -55,7 +69,10 @@
       "name": "Datos válidos",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
@@ -63,25 +80,47 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "q", "value": "={{ $json.body.ciudad.trim() }}" },
-            { "name": "format", "value": "json" },
-            { "name": "limit", "value": "1" }
+            {
+              "name": "q",
+              "value": "={{ $json.body.ciudad.trim() }}"
+            },
+            {
+              "name": "format",
+              "value": "json"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
           ]
         },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "User-Agent", "value": "apapacho/1.0 (CAMBIA-ESTO@tu-correo.com)" }
+            {
+              "name": "User-Agent",
+              "value": "apapacho/1.0 (CAMBIA-ESTO@tu-correo.com)"
+            }
           ]
         },
-        "options": {}
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
       },
       "id": "0b4f7c1e-1a01-4c55-9f0e-6a1d2b3c4d03",
       "name": "Nominatim",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 200],
-      "alwaysOutputData": true
+      "position": [
+        440,
+        200
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -95,9 +134,13 @@
           "conditions": [
             {
               "id": "c4",
-              "leftValue": "={{ ($json.lat || '').toString() }}",
+              "leftValue": "={{ ((($json.body || [])[0] || {}).lat || '').toString() }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -109,24 +152,30 @@
       "name": "Ciudad encontrada",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [660, 200]
+      "position": [
+        660,
+        200
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://apapacho:8000/carta",
+        "url": "http://apapacho:8000/carta/completa",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  year: Number($('Webhook').item.json.body.fecha.split('-')[0]),\n  month: Number($('Webhook').item.json.body.fecha.split('-')[1]),\n  day: Number($('Webhook').item.json.body.fecha.split('-')[2]),\n  hour: $('Webhook').item.json.body.hora ? Number($('Webhook').item.json.body.hora.split(':')[0]) : null,\n  minute: $('Webhook').item.json.body.hora ? Number($('Webhook').item.json.body.hora.split(':')[1]) : null,\n  lat: Number($json.lat),\n  lng: Number($json.lon)\n}) }}",
+        "jsonBody": "={{ JSON.stringify({\n  year: Number($('Webhook').item.json.body.fecha.split('-')[0]),\n  month: Number($('Webhook').item.json.body.fecha.split('-')[1]),\n  day: Number($('Webhook').item.json.body.fecha.split('-')[2]),\n  hour: $('Webhook').item.json.body.hora ? Number($('Webhook').item.json.body.hora.split(':')[0]) : null,\n  minute: $('Webhook').item.json.body.hora ? Number($('Webhook').item.json.body.hora.split(':')[1]) : null,\n  lat: Number($json.body[0].lat),\n  lng: Number($json.body[0].lon)\n}) }}",
         "options": {}
       },
       "id": "0b4f7c1e-1a01-4c55-9f0e-6a1d2b3c4d05",
       "name": "apapacho",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [880, 100],
+      "position": [
+        880,
+        100
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "apapachoCredential",
@@ -138,70 +187,170 @@
     {
       "parameters": {
         "respondWith": "firstIncomingItem",
-        "options": { "responseCode": 200 }
+        "options": {
+          "responseCode": 200
+        }
       },
       "id": "0b4f7c1e-1a01-4c55-9f0e-6a1d2b3c4d06",
       "name": "Responder resultado",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1100, 0]
+      "position": [
+        1100,
+        0
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "{\"error\": \"calculo\"}",
-        "options": { "responseCode": 502 }
+        "options": {
+          "responseCode": 502
+        }
       },
       "id": "0b4f7c1e-1a01-4c55-9f0e-6a1d2b3c4d07",
       "name": "Error de cálculo",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1100, 200]
+      "position": [
+        1100,
+        200
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "{\"error\": \"ciudad_no_encontrada\"}",
-        "options": { "responseCode": 422 }
+        "options": {
+          "responseCode": 422
+        }
       },
       "id": "0b4f7c1e-1a01-4c55-9f0e-6a1d2b3c4d08",
       "name": "Ciudad no encontrada",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [880, 320]
+      "position": [
+        880,
+        320
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "{\"error\": \"datos_incompletos\"}",
-        "options": { "responseCode": 400 }
+        "options": {
+          "responseCode": 400
+        }
       },
       "id": "0b4f7c1e-1a01-4c55-9f0e-6a1d2b3c4d09",
       "name": "Datos incompletos",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [440, 420]
+      "position": [
+        440,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"error\": \"geocodificacion\"}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "id": "0b4f7c1e-1a01-4c55-9f0e-6a1d2b3c4d10",
+      "name": "Error de Nominatim",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        420
+      ]
     }
   ],
   "connections": {
-    "Webhook": { "main": [[{ "node": "Datos válidos", "type": "main", "index": 0 }]] },
-    "Datos válidos": {
+    "Webhook": {
       "main": [
-        [{ "node": "Nominatim", "type": "main", "index": 0 }],
-        [{ "node": "Datos incompletos", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Datos válidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Nominatim": { "main": [[{ "node": "Ciudad encontrada", "type": "main", "index": 0 }]] },
+    "Datos válidos": {
+      "main": [
+        [
+          {
+            "node": "Nominatim",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Datos incompletos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nominatim": {
+      "main": [
+        [
+          {
+            "node": "Ciudad encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error de Nominatim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Ciudad encontrada": {
       "main": [
-        [{ "node": "apapacho", "type": "main", "index": 0 }],
-        [{ "node": "Ciudad no encontrada", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "apapacho",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ciudad no encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "apapacho": {
       "main": [
-        [{ "node": "Responder resultado", "type": "main", "index": 0 }],
-        [{ "node": "Error de cálculo", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Responder resultado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error de cálculo",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

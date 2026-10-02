@@ -46,6 +46,26 @@ entre las 00:00 y las 23:59 de ese día (ocurre aproximadamente uno de cada dos 
 Horas que no existen o se repiten por un cambio de hora (madrugada del cambio al horario de
 verano / invierno) se resuelven asumiendo horario estándar, en lugar de devolver error.
 
+### Carta completa
+
+`POST /carta/completa` recibe exactamente la misma entrada y devuelve los mismos cinco campos
+que `/carta`, más la carta natal completa:
+
+| Campo | Contenido |
+|---|---|
+| `planetas` | Sol a Plutón, Nodo Norte verdadero y Quirón. Cada uno con `clave`, `nombre`, `signo`, `grado` (0-30 dentro del signo), `grado_texto` (`"22°46′"`), `casa` (1-12), `retrogrado` y `puede_variar`. |
+| `angulos` | `ascendente` y `medio_cielo`, con signo y grado. |
+| `casas` | Las 12 cúspides Placidus, con signo y grado. |
+| `elementos` | Recuento de fuego, tierra, aire y agua. |
+| `modalidades` | Recuento de cardinal, fijo y mutable. |
+| `fase_lunar` | `nombre` (Luna nueva ... Luna menguante), `angulo` Luna-Sol e `iluminacion` en %. |
+
+Elementos y modalidades cuentan los diez planetas de Sol a Plutón, más el ascendente si hay
+hora. Nodo Norte y Quirón no cuentan.
+
+**Sin hora**: todo se calcula a las 12:00 locales. `angulos`, `casas` y la `casa` de cada
+planeta son `null`, y cada planeta marca `puede_variar: true` si cambia de signo ese día.
+
 Otros endpoints:
 
 | Método | Ruta | Auth | Descripción |
@@ -53,7 +73,8 @@ Otros endpoints:
 | GET | `/` | no | Nombre, licencia y enlace al código fuente (oferta AGPL) |
 | GET | `/health` | no | `{"status": "ok"}` |
 | GET | `/docs` | no | OpenAPI / Swagger |
-| POST | `/carta` | `X-API-Key` | Cálculo |
+| POST | `/carta` | `X-API-Key` | Sol, Luna y Ascendente |
+| POST | `/carta/completa` | `X-API-Key` | Carta natal completa |
 
 Errores: `401` API key ausente o incorrecta · `422` validación · `429` rate limit.
 
@@ -283,7 +304,9 @@ formulario: súbelo si esperas más de 30 envíos por minuto.
 ## Formulario web de ejemplo
 
 `web/formulario.html` es un formulario accesible, sin dependencias externas, que envía ciudad,
-fecha y hora a un webhook de n8n y muestra Sol, Luna y Ascendente. Cambia `WEBHOOK_URL` dentro
+fecha y hora a un webhook de n8n y muestra Sol, Luna y Ascendente con sus símbolos. Si la
+respuesta trae la carta completa, muestra también planetas, ángulos, elementos, modalidades y
+fase lunar. Cambia `WEBHOOK_URL` dentro
 del archivo y súbelo a cualquier hosting estático. La API key nunca va en el HTML: la guarda n8n.
 
 `n8n/workflow-apapacho.json` es el workflow de n8n que hay detrás, listo para importar
