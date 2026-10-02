@@ -9,6 +9,18 @@ Ya tienes la estructura y el diseño del formulario de Apapacho. El backend est�
 desplegado. Tu trabajo es conectar tu diseño a ese backend siguiendo este contrato, sin cambiar
 el backend.
 
+Hay tres funciones, cada una con su webhook de n8n:
+
+| Función | Webhook |
+|---|---|
+| Carta natal | `https://<subdominio.midominio.com>/webhook/apapacho` |
+| Compatibilidad (sinastría) | `https://<subdominio.midominio.com>/webhook/apapacho-compatibilidad` |
+| Revolución solar | `https://<subdominio.midominio.com>/webhook/apapacho-revolucion` |
+
+Las tres funcionan igual: el formulario envía JSON por POST, sin claves, y recibe JSON. Lo que
+se explica abajo para la carta natal (campo trampa, errores, cómo mostrar la rueda,
+accesibilidad) vale también para las otras dos.
+
 ## Cómo funciona por detrás
 
 ```
@@ -257,11 +269,152 @@ para evitar envíos dobles.
 - Contraste suficiente en modo claro y oscuro; foco visible; nada de scroll horizontal a 375 px.
 - Respeta `prefers-reduced-motion` si animas algo.
 
-## Lo que todavía NO está disponible
+## Compatibilidad (sinastría)
 
-El motor ya calcula sinastría (dos personas) y revolución solar, pero **aún no hay webhooks de
-n8n para ellas**. No las conectes; si el diseño las incluye, déjalas como "próximamente" y
-avísame para crear los webhooks.
+`POST https://<subdominio.midominio.com>/webhook/apapacho-compatibilidad`:
+
+```json
+{ "persona_a": { "ciudad": "Madrid", "fecha": "1990-07-15", "hora": "14:30" },
+  "persona_b": { "ciudad": "Ciudad de México", "fecha": "1988-03-02", "hora": null },
+  "website": "" }
+```
+
+Cada persona lleva ciudad, fecha y hora con las mismas reglas que la carta natal. La hora de
+cada una es opcional por separado. Un solo campo trampa `website`, fuera de las personas.
+
+Respuesta 200 (ejemplo real, recortado):
+
+```json
+{
+  "persona_a": {
+    "sol": "Cáncer",
+    "luna": "Aries",
+    "ascendente": "Libra",
+    "hora_exacta": true,
+    "luna_puede_variar": false
+  },
+  "persona_b": {
+    "sol": "Piscis",
+    "luna": "Virgo",
+    "ascendente": "Aries",
+    "hora_exacta": true,
+    "luna_puede_variar": false
+  },
+  "aspectos": [
+    {
+      "a": "Marte",
+      "b": "Saturno",
+      "tipo": "trígono",
+      "armonico": true,
+      "angulo": 120.66,
+      "orbe": 0.66,
+      "orbe_texto": "0°40′",
+      "puede_variar": false,
+      "generacional": false,
+      "peso": 3.54
+    },
+    {
+      "a": "Plutón",
+      "b": "Mercurio",
+      "tipo": "cuadratura",
+      "armonico": false,
+      "angulo": 90.66,
+      "orbe": 0.66,
+      "orbe_texto": "0°40′",
+      "puede_variar": false,
+      "generacional": false,
+      "peso": -1.42
+    },
+    {
+      "...": "28 más, ordenados por orbe"
+    }
+  ],
+  "puntuacion": 80,
+  "resumen": {
+    "armonicos": 15,
+    "tensos": 8,
+    "conjunciones": 8,
+    "puntuacion_bruta": 28.03
+  }
+}
+```
+
+- `persona_a` y `persona_b`: los tres grandes de cada persona, como en la carta natal.
+- `puntuacion`: afinidad de 0 a 100. **50 es una pareja típica**; el 10 % con más afinidad
+  supera 80 y el 10 % con menos queda por debajo de 21. Es un indicador lúdico: dilo en la
+  interfaz, por ejemplo "orientativo, para disfrutar".
+- `aspectos`: entre un punto de A (`a`) y uno de B (`b`), ordenados del más exacto al menos
+  exacto. Muéstralos como "Marte de A trígono Saturno de B". Si quieres poner nombres,
+  pídelos en el formulario y úsalos solo en el navegador: **no los envíes**, el webhook no
+  los necesita y rechaza campos que no conoce en cada persona.
+  - `peso`: cuánto suma (positivo) o resta (negativo) a la puntuación. Útil para destacar los
+    aspectos que más pesan.
+  - `generacional: true`: aspecto entre Urano, Neptuno o Plutón de ambas personas. No cuenta
+    en la puntuación; puedes ocultarlos o mostrarlos atenuados.
+  - `puede_variar: true`: alguna de las dos no dio hora y el aspecto podría no darse.
+- `resumen`: número de aspectos armónicos, tensos y conjunciones.
+- No incluye rueda.
+
+Errores: los mismos que en la carta natal, salvo que `ciudad_no_encontrada` indica de quién:
+
+```json
+{ "error": "ciudad_no_encontrada", "campo": "persona_a" }
+```
+
+`campo` es `persona_a` o `persona_b`: lleva el foco a la ciudad de esa persona.
+
+## Revolución solar
+
+`POST https://<subdominio.midominio.com>/webhook/apapacho-revolucion`:
+
+```json
+{ "ciudad": "Madrid", "fecha": "1990-07-15", "hora": "14:30",
+  "anio": 2026, "ciudad_actual": "Ciudad de México", "website": "" }
+```
+
+| Campo | Notas |
+|---|---|
+| `ciudad`, `fecha` | De nacimiento, como en la carta natal. |
+| `hora` | **Obligatoria** (`HH:MM`). Sin hora no se puede calcular: no ofrezcas la casilla "No sé mi hora" aquí; explica por qué. |
+| `anio` | Año del cumpleaños, número o texto de 4 cifras. Entre el año de nacimiento y 2100. Por defecto, el año en curso. |
+| `ciudad_actual` | Opcional. Dónde pasará (o pasó) ese cumpleaños. Vacío o ausente = la ciudad de nacimiento. Explícalo: la revolución cambia según el lugar. |
+
+Respuesta 200 (ejemplo real, recortado): la **misma estructura que la carta natal completa**,
+rueda incluida, más estos campos:
+
+```json
+{
+  "sol": "Cáncer",
+  "luna": "Leo",
+  "ascendente": "Aries",
+  "hora_exacta": true,
+  "luna_puede_variar": false,
+  "...": "planetas, angulos, casas, elementos, modalidades, fase_lunar, aspectos y rueda_svg: igual que en la carta natal",
+  "anio": 2026,
+  "momento_utc": "2026-07-15T05:19:55+00:00",
+  "momento_local": "2026-07-14T23:19:55-06:00",
+  "zona_horaria": "America/Mexico_City",
+  "sol_natal": {
+    "longitud": 112.77,
+    "signo": "Cáncer",
+    "grado": 22.77,
+    "grado_texto": "22°46′"
+  }
+}
+```
+
+- `momento_local`: cuándo ocurre la revolución en la hora del lugar. Muéstralo en lenguaje
+  natural ("14 de julio de 2026, 23:19"). Fíjate en que puede caer el día antes o después del
+  cumpleaños.
+- `sol_natal`: posición del Sol al nacer; el Sol de la revolución está en el mismo grado.
+- Todo lo demás (planetas, casas, aspectos, rueda...) se pinta igual que en la carta natal:
+  reutiliza los mismos componentes.
+
+Errores: los mismos que en la carta natal, más:
+
+- `400 datos_incompletos` también cuando falta la hora o el año es anterior al nacimiento o
+  posterior a 2100. Valídalo antes de enviar para dar un mensaje concreto.
+- `422 ciudad_no_encontrada` con `"campo": "ciudad"` o `"campo": "ciudad_actual"`.
 
 ## Pruebas antes de darlo por terminado
 
@@ -273,9 +426,16 @@ avísame para crear los webhooks.
 | Fecha imposible | 1990-02-30 | Mensaje de cálculo (si el navegador deja enviarla) |
 | Móvil | 375 px de ancho | Sin scroll horizontal; tabla y rueda legibles |
 | Teclado y lector | Solo teclado | Se puede rellenar, enviar y leer el resultado |
+| Compatibilidad | A: Madrid, 1990-07-15, 14:30. B: Ciudad de México, 1988-03-02, 08:10 | Puntuación 80, A Cáncer/Aries/Libra, B Piscis/Virgo/Aries |
+| Compatibilidad sin hora | La misma, con B sin hora | Puntuación 72, B sin ascendente, algún aspecto marcado como variable |
+| Compatibilidad, ciudad falsa | B en "Xqzwvlandia" | Mensaje de ciudad no encontrada y foco en la ciudad de B |
+| Revolución solar | Madrid, 1990-07-15, 14:30, año 2026, sin ciudad actual | 15/07/2026 07:19 (Madrid), Asc Cáncer, con rueda |
+| Revolución en otra ciudad | Igual, con ciudad actual "Ciudad de México" | 14/07/2026 23:19 (hora de México), Asc Aries |
+| Revolución sin hora | Sin hora | El formulario no deja enviar y lo explica |
 
 ## Al terminar, dime
 
-- Dónde está publicado el formulario (dominio exacto, para configurar CORS en n8n).
+- Dónde está publicado el formulario (dominio exacto, para configurar CORS en los tres
+  webhooks de n8n).
 - El resultado de cada prueba.
 - Cualquier dato que tu diseño necesite y la respuesta no traiga.

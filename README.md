@@ -402,7 +402,18 @@ respuestas de error con los códigos que espera el formulario. Para usarlo:
 4. En el nodo **Webhook**, cambia *Allowed Origins (CORS)* de `*` al dominio del formulario.
 5. Publica el workflow. La URL de producción es `https://<tu-n8n>/webhook/apapacho`.
 
-El workflow no guarda ejecuciones (`Do not save`). n8n marca cada ejecución como borrada al
+Hay dos workflows más, que se importan igual, para las otras dos funciones del formulario:
+
+| Archivo | Webhook | Llama a |
+|---|---|---|
+| `n8n/workflow-apapacho.json` | `/webhook/apapacho` | `/carta/completa` |
+| `n8n/workflow-compatibilidad.json` | `/webhook/apapacho-compatibilidad` | `/sinastria` |
+| `n8n/workflow-revolucion-solar.json` | `/webhook/apapacho-revolucion` | `/revolucion-solar` |
+
+Los que buscan dos ciudades esperan 1 segundo entre las dos consultas a Nominatim, que
+admite como mucho una por segundo. Todos se probaron en n8n 2.21.7.
+
+Ningún workflow guarda ejecuciones (`Do not save`). n8n marca cada ejecución como borrada al
 terminar y su limpieza automática (`EXECUTIONS_DATA_PRUNE=true`) la elimina después.
 
 `docs/prompt-agente-n8n.md` contiene un prompt para que un agente construya ese mismo workflow
