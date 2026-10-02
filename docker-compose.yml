@@ -1,0 +1,35 @@
+services:
+  apapacho:
+    build: .
+    image: apapacho:latest
+    container_name: apapacho
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # "*" es seguro aquí porque el puerto no está publicado: solo llega tráfico del proxy
+      # que compartas en la red interna. Ajusta a la IP/subred del proxy si lo prefieres.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+    # Sin "ports": el servicio NO se publica al exterior. El reverse proxy debe unirse a la
+    # red "apapacho_net" y hablar con http://apapacho:8000.
+    expose:
+      - "8000"
+    networks:
+      - apapacho_net
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+networks:
+  apapacho_net:
+    name: apapacho_net
+    # internal: sin salida a Internet. El servicio no la necesita (cálculo 100% offline).
+    # El contenedor del reverse proxy debe conectarse a esta red además de a la suya.
+    internal: true

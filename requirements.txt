@@ -1,0 +1,9 @@
+# Versiones fijadas. La API de Kerykeion cambia entre versiones mayores:
+# app/service.py está escrito contra la API de kerykeion 5.12.x
+# (AstrologicalSubjectFactory.from_birth_data).
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+kerykeion==5.12.10
+timezonefinder==9.0.0
+pydantic==2.13.5
+slowapi==0.1.10

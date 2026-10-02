@@ -1,0 +1,22 @@
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Caché de Kerykeion / requests-cache (no debería generarse en modo offline)
+*.sqlite
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
