@@ -253,8 +253,32 @@ header `User-Agent` identificativo, y toma `[0].lat` y `[0].lon`).
    Por ejemplo, un nodo *IF* sobre `luna_puede_variar` para avisar de que, sin hora exacta,
    la Luna podría ser del signo contiguo.
 
-Si n8n corre en el mismo VPS con Docker, puedes saltarte el proxy: conecta su contenedor a
-`apapacho_net` y llama a `http://apapacho:8000/carta` directamente.
+Si n8n corre en el mismo VPS con Docker, puedes saltarte el proxy y llamar a
+`http://apapacho:8000/carta` directamente. Para ello, en el `docker-compose.yml` de n8n añade
+al servicio `n8n` las dos redes y declara `apapacho_net` como externa:
+
+```yaml
+services:
+  n8n:
+    # ...
+    networks:
+      - default        # la red de siempre: Postgres, Traefik
+      - apapacho_net
+    labels:
+      # Imprescindible si n8n se publica con Traefik: con dos redes, Traefik podría
+      # intentar llegar a n8n por apapacho_net (interna) y la web de n8n daría error.
+      - traefik.docker.network=<proyecto>_default   # p. ej. n8n_default
+      # ...resto de labels
+
+networks:
+  apapacho_net:
+    external: true
+```
+
+Aplica con `docker compose up -d n8n`. Como `apapacho_net` la crea el compose de apapacho,
+levanta apapacho antes que n8n y no hagas `docker compose down` en apapacho sin parar n8n.
+Todas las peticiones llegarán desde la IP de n8n, así que `RATE_LIMIT` es el total del
+formulario: súbelo si esperas más de 30 envíos por minuto.
 
 ## Licencia y aviso sobre Swiss Ephemeris
 
