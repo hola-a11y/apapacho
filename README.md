@@ -280,6 +280,15 @@ levanta apapacho antes que n8n y no hagas `docker compose down` en apapacho sin 
 Todas las peticiones llegarán desde la IP de n8n, así que `RATE_LIMIT` es el total del
 formulario: súbelo si esperas más de 30 envíos por minuto.
 
+## Formulario web de ejemplo
+
+`web/formulario.html` es un formulario accesible, sin dependencias externas, que envía ciudad,
+fecha y hora a un webhook de n8n y muestra Sol, Luna y Ascendente. Cambia `WEBHOOK_URL` dentro
+del archivo y súbelo a cualquier hosting estático. La API key nunca va en el HTML: la guarda n8n.
+
+`docs/prompt-agente-n8n.md` contiene un prompt listo para que un agente construya el workflow
+de n8n que hay detrás (webhook, Nominatim, apapacho y respuestas de error).
+
 ## Licencia y aviso sobre Swiss Ephemeris
 
 Este proyecto se distribuye bajo la **GNU Affero General Public License v3.0** (`LICENSE`).

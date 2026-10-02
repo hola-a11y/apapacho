@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sol, Luna y Ascendente</title>
+<meta name="description" content="Calcula tu signo solar, lunar y ascendente a partir de tus datos de nacimiento.">
+<!--
+  Formulario de ejemplo para apapacho (AGPL-3.0): https://github.com/hola-a11y/apapacho
+
+  CONFIGURACIÓN: cambia WEBHOOK_URL (más abajo, en el bloque de JavaScript) por la URL de producción
+  del nodo Webhook de tu workflow de n8n. Ejemplo:
+      https://n8n.tudominio.com/webhook/apapacho
+
+  La API key de apapacho NUNCA va en este archivo: este HTML es público. La clave vive en la
+  credencial de n8n, y es n8n quien llama a apapacho.
+
+  Este archivo no carga nada externo (ni fuentes, ni scripts, ni analítica). Los datos solo se
+  envían a tu n8n.
+-->
+<style>
+  :root {
+    --bg: #faf7f2;
+    --surface: #ffffff;
+    --text: #1f1a17;
+    --muted: #5c534c;
+    --border: #d9d0c7;
+    --accent: #7a3e9d;
+    --accent-text: #ffffff;
+    --focus: #1a5fb4;
+    --error-bg: #fdecea;
+    --error-text: #8a1c12;
+    --note-bg: #f3ecf8;
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17141a;
+      --surface: #221e26;
+      --text: #f2edf5;
+      --muted: #b9afc0;
+      --border: #3d3644;
+      --accent: #c99be6;
+      --accent-text: #17141a;
+      --focus: #8ab4f8;
+      --error-bg: #3a1d1b;
+      --error-text: #ffb4a9;
+      --note-bg: #2c2433;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.5;
+  }
+  main {
+    max-width: 34rem;
+    margin: 0 auto;
+    padding: 2.5rem 1rem 3rem;
+  }
+  h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 .5rem; }
+  .intro { color: var(--muted); margin: 0 0 1.75rem; }
+  form, .resultado {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+  }
+  .campo { margin-bottom: 1.25rem; }
+  label { display: block; font-weight: 600; margin-bottom: .35rem; }
+  .ayuda { display: block; color: var(--muted); font-size: .9375rem; margin-top: .3rem; }
+  input[type="text"], input[type="date"], input[type="time"] {
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .65rem .75rem;
+    min-height: 2.75rem;
+  }
+  input:disabled { opacity: .55; }
+  .check { display: flex; gap: .6rem; align-items: center; margin-top: .6rem; font-weight: 400; }
+  .check input { width: 1.25rem; height: 1.25rem; accent-color: var(--accent); }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  button {
+    width: 100%;
+    font: inherit;
+    font-weight: 700;
+    color: var(--accent-text);
+    background: var(--accent);
+    border: 0;
+    border-radius: 8px;
+    padding: .8rem 1rem;
+    min-height: 3rem;
+    cursor: pointer;
+  }
+  button[aria-busy="true"] { opacity: .7; cursor: progress; }
+  /* Campo trampa para bots: oculto a personas y lectores de pantalla. */
+  .trampa { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+  .error {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border-radius: 8px;
+    padding: .75rem 1rem;
+    margin: 0 0 1.25rem;
+  }
+  .resultado { margin-top: 1.5rem; }
+  .resultado h2 { font-size: 1.25rem; margin: 0 0 1rem; }
+  .resultado dl { display: grid; grid-template-columns: auto 1fr; gap: .5rem 1rem; margin: 0; }
+  .resultado dt { color: var(--muted); }
+  .resultado dd { margin: 0; font-weight: 700; font-size: 1.125rem; }
+  .nota { background: var(--note-bg); border-radius: 8px; padding: .75rem 1rem; margin: 1rem 0 0; }
+  .pie { color: var(--muted); font-size: .875rem; margin-top: 2rem; }
+  .pie a { color: inherit; }
+  @media (prefers-reduced-motion: no-preference) {
+    button { transition: opacity .15s ease; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sol, Luna y Ascendente</h1>
+  <p class="intro">Escribe dónde y cuándo naciste. No guardamos tus datos: se usan para el cálculo y se descartan.</p>
+
+  <form id="formulario" novalidate>
+    <p id="error" class="error" role="alert" hidden></p>
+
+    <div class="campo">
+      <label for="ciudad">Ciudad de nacimiento</label>
+      <input type="text" id="ciudad" name="ciudad" autocomplete="off" required
+             aria-describedby="ciudad-ayuda" maxlength="120">
+      <span id="ciudad-ayuda" class="ayuda">Añade el país si el nombre se repite. Ejemplo: Valencia, Venezuela.</span>
+    </div>
+
+    <div class="campo">
+      <label for="fecha">Fecha de nacimiento</label>
+      <input type="date" id="fecha" name="fecha" required min="1900-01-01" max="2100-12-31">
+    </div>
+
+    <div class="campo">
+      <label for="hora">Hora de nacimiento</label>
+      <input type="time" id="hora" name="hora" aria-describedby="hora-ayuda">
+      <span id="hora-ayuda" class="ayuda">Hora local del lugar, tal como aparece en tu acta. Sin hora no se puede calcular el ascendente.</span>
+      <label class="check">
+        <input type="checkbox" id="sin-hora" name="sin-hora">
+        No sé mi hora de nacimiento
+      </label>
+    </div>
+
+    <div class="trampa" aria-hidden="true">
+      <label for="website">No rellenes este campo</label>
+      <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+    </div>
+
+    <button type="submit" id="enviar">Calcular</button>
+  </form>
+
+  <section id="resultado" class="resultado" tabindex="-1" aria-labelledby="resultado-titulo" hidden>
+    <h2 id="resultado-titulo">Tu carta</h2>
+    <dl>
+      <dt>Sol</dt><dd id="r-sol"></dd>
+      <dt>Luna</dt><dd id="r-luna"></dd>
+      <dt>Ascendente</dt><dd id="r-asc"></dd>
+    </dl>
+    <p id="r-nota-luna" class="nota" hidden>
+      Sin la hora exacta, la Luna podría estar en el signo contiguo: ese día cambió de signo.
+    </p>
+    <p id="r-nota-asc" class="nota" hidden>
+      Para conocer tu ascendente necesitamos la hora de nacimiento.
+    </p>
+  </section>
+
+  <p class="pie">
+    Cálculo con Swiss Ephemeris.
+    <a href="https://github.com/hola-a11y/apapacho">Código fuente</a> bajo licencia AGPL-3.0.
+  </p>
+</main>
+
+<script>
+  // ⚙️ Cambia esto por la URL de producción del nodo Webhook de n8n.
+  const WEBHOOK_URL = "https://n8n.tudominio.com/webhook/apapacho";
+
+  const form = document.getElementById("formulario");
+  const errorBox = document.getElementById("error");
+  const boton = document.getElementById("enviar");
+  const hora = document.getElementById("hora");
+  const sinHora = document.getElementById("sin-hora");
+  const resultado = document.getElementById("resultado");
+
+  sinHora.addEventListener("change", () => {
+    hora.disabled = sinHora.checked;
+    if (sinHora.checked) hora.value = "";
+  });
+
+  function mostrarError(texto, campo) {
+    errorBox.textContent = texto;
+    errorBox.hidden = false;
+    form.querySelectorAll("[aria-invalid]").forEach((el) => el.removeAttribute("aria-invalid"));
+    if (campo) {
+      campo.setAttribute("aria-invalid", "true");
+      campo.focus();
+    }
+  }
+
+  function limpiarError() {
+    errorBox.hidden = true;
+    errorBox.textContent = "";
+    form.querySelectorAll("[aria-invalid]").forEach((el) => el.removeAttribute("aria-invalid"));
+  }
+
+  form.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    limpiarError();
+    resultado.hidden = true;
+
+    const ciudad = form.ciudad.value.trim();
+    const fecha = form.fecha.value;          // "AAAA-MM-DD"
+    const horaValor = sinHora.checked ? "" : hora.value; // "HH:MM" o ""
+
+    if (!ciudad) return mostrarError("Escribe tu ciudad de nacimiento.", form.ciudad);
+    if (!fecha) return mostrarError("Indica tu fecha de nacimiento.", form.fecha);
+    const anio = Number(fecha.slice(0, 4));
+    if (anio < 1900 || anio > 2100) return mostrarError("La fecha debe estar entre 1900 y 2100.", form.fecha);
+    if (!horaValor && !sinHora.checked) {
+      return mostrarError("Indica tu hora de nacimiento o marca «No sé mi hora de nacimiento».", hora);
+    }
+
+    boton.setAttribute("aria-busy", "true");
+    boton.disabled = true;
+    boton.textContent = "Calculando…";
+
+    try {
+      const respuesta = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ciudad,
+          fecha,
+          hora: horaValor || null,
+          website: form.website.value, // trampa para bots
+        }),
+      });
+
+      let datos = null;
+      try { datos = await respuesta.json(); } catch (_) { /* respuesta vacía */ }
+
+      if (!respuesta.ok) {
+        const codigo = datos && datos.error;
+        if (codigo === "ciudad_no_encontrada") {
+          return mostrarError("No encontramos esa ciudad. Revisa cómo está escrita o añade el país.", form.ciudad);
+        }
+        if (codigo === "datos_incompletos") {
+          return mostrarError("Faltan datos. Revisa la ciudad y la fecha.", form.ciudad);
+        }
+        return mostrarError("No hemos podido hacer el cálculo ahora. Inténtalo de nuevo en un minuto.");
+      }
+
+      document.getElementById("r-sol").textContent = datos.sol;
+      document.getElementById("r-luna").textContent = datos.luna;
+      document.getElementById("r-asc").textContent = datos.ascendente || "Sin hora, no disponible";
+      document.getElementById("r-nota-luna").hidden = !datos.luna_puede_variar;
+      document.getElementById("r-nota-asc").hidden = Boolean(datos.ascendente);
+      resultado.hidden = false;
+      resultado.focus();
+    } catch (_) {
+      mostrarError("No hay conexión con el servidor. Comprueba tu conexión e inténtalo de nuevo.");
+    } finally {
+      boton.removeAttribute("aria-busy");
+      boton.disabled = false;
+      boton.textContent = "Calcular";
+    }
+  });
+</script>
+</body>
+</html>
