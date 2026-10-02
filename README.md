@@ -286,8 +286,21 @@ formulario: súbelo si esperas más de 30 envíos por minuto.
 fecha y hora a un webhook de n8n y muestra Sol, Luna y Ascendente. Cambia `WEBHOOK_URL` dentro
 del archivo y súbelo a cualquier hosting estático. La API key nunca va en el HTML: la guarda n8n.
 
-`docs/prompt-agente-n8n.md` contiene un prompt listo para que un agente construya el workflow
-de n8n que hay detrás (webhook, Nominatim, apapacho y respuestas de error).
+`n8n/workflow-apapacho.json` es el workflow de n8n que hay detrás, listo para importar
+(probado en n8n 2.21.7): webhook, validación con campo trampa para bots, Nominatim, apapacho y
+respuestas de error con los códigos que espera el formulario. Para usarlo:
+
+1. En n8n: *Create workflow* → menú `...` → *Import from File* → elige el archivo.
+2. Abre el nodo **apapacho** y, si avisa de credencial, elige tu credencial Header Auth.
+3. En el nodo **Nominatim**, cambia el correo del header `User-Agent` por el tuyo.
+4. En el nodo **Webhook**, cambia *Allowed Origins (CORS)* de `*` al dominio del formulario.
+5. Publica el workflow. La URL de producción es `https://<tu-n8n>/webhook/apapacho`.
+
+El workflow no guarda ejecuciones (`Do not save`). n8n marca cada ejecución como borrada al
+terminar y su limpieza automática (`EXECUTIONS_DATA_PRUNE=true`) la elimina después.
+
+`docs/prompt-agente-n8n.md` contiene un prompt para que un agente construya ese mismo workflow
+desde cero, si prefieres no importarlo.
 
 ## Licencia y aviso sobre Swiss Ephemeris
 
