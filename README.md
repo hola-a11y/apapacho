@@ -408,6 +408,10 @@ terminar y su limpieza automática (`EXECUTIONS_DATA_PRUNE=true`) la elimina des
 `docs/prompt-agente-n8n.md` contiene un prompt para que un agente construya ese mismo workflow
 desde cero, si prefieres no importarlo.
 
+`docs/prompt-agente-formulario.md` contiene un prompt para que un agente conecte un diseño de
+formulario propio a este backend: petición, respuesta campo por campo, errores, cómo mostrar
+la rueda de forma segura y requisitos de accesibilidad.
+
 ## Licencia y aviso sobre Swiss Ephemeris
 
 Este proyecto se distribuye bajo la **GNU Affero General Public License v3.0** (`LICENSE`).
